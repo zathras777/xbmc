@@ -351,9 +351,15 @@ bool CMediaSourceSettings::GetSource(const std::string &category, const TiXmlNod
   const TiXmlNode *pLockCode = source->FirstChild("lockcode");
   const TiXmlNode *pBadPwdCount = source->FirstChild("badpwdcount");
   const TiXmlNode *pThumbnailNode = source->FirstChild("thumbnail");
+#ifdef HEADLESS
+  const TiXmlNode *pScraperNode = source->FirstChild("scraper");
+#endif
 
-  if (strName.empty() || vecPaths.empty())
+  if (strName.empty() || vecPaths.empty()) {
+    CLog::Log(LOGINFO, "source entry failed. Name: %s, vecPaths.size: %ld", 
+              strName.c_str(), vecPaths.size());
     return false;
+  }
 
   vector<CStdString> verifiedPaths;
   // disallowed for files, or theres only a single path in the vector
@@ -412,6 +418,11 @@ bool CMediaSourceSettings::GetSource(const std::string &category, const TiXmlNod
 
   if (pThumbnailNode && pThumbnailNode->FirstChild())
     share.m_strThumbnailImage = pThumbnailNode->FirstChild()->Value();
+
+#ifdef HEADLESS
+  if (pScraperNode && pScraperNode->FirstChild())
+    share.m_strScraper = pScraperNode->FirstChild()->Value();
+#endif
 
   XMLUtils::GetBoolean(source, "allowsharing", share.m_allowSharing);
 

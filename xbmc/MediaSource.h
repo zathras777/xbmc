@@ -99,6 +99,10 @@ public:
   std::vector<CStdString> vecPaths;
   bool m_ignore; /// <Do not store in xml
   bool m_allowSharing; /// <Allow browsing of source from UPnP / WebServer
+
+#ifdef HEADLESS
+  CStdString m_strScraper; ///< Content type for video sources
+#endif
 };
 
 /*!

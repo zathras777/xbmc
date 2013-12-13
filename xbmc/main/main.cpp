@@ -46,7 +46,12 @@ int main(int argc, char* argv[])
   // set up some xbmc specific relationships
   XBMC::Context context;
 
+#ifdef HEADLESS
+  bool renderGUI = false;
+#else
   bool renderGUI = true;
+#endif
+
   //this can't be set from CAdvancedSettings::Initialize() because it will overwrite
   //the loglevel set with the --debug flag
 #ifdef _DEBUG
@@ -59,7 +64,7 @@ int main(int argc, char* argv[])
   CLog::SetLogLevel(g_advancedSettings.m_logLevel);
 
 #ifdef TARGET_POSIX
-#if defined(DEBUG)
+#if defined(DEBUG) || defined(HEADLESS)
   struct rlimit rlim;
   rlim.rlim_cur = rlim.rlim_max = RLIM_INFINITY;
   if (setrlimit(RLIMIT_CORE, &rlim) == -1)

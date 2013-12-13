@@ -49,6 +49,7 @@
 #include "TextureCache.h"
 #include "GUIUserMessages.h"
 #include "URL.h"
+#include "settings/MediaSourceSettings.h"
 
 using namespace std;
 using namespace XFILE;
@@ -122,7 +123,8 @@ namespace VIDEO
            * doesn't exist rather than a NAS being switched off.  A manual clean from settings
            * will still pick up and remove it though.
            */
-          CLog::Log(LOGWARNING, "%s directory '%s' does not exist - skipping scan%s.", __FUNCTION__, directory.c_str(), m_bClean ? " and clean" : "");
+          CLog::Log(LOGWARNING, "%s directory '%s' does not exist - skipping scan%s.", 
+                    __FUNCTION__, directory.c_str(), m_bClean ? " and clean" : "");
           m_pathsToScan.erase(m_pathsToScan.begin());
         }
         else if (!DoScan(directory))
@@ -189,6 +191,56 @@ namespace VIDEO
     m_bRunning = true;
   }
 
+#ifdef HEADLESS
+  void CVideoInfoScanner::ScanSources()
+  {
+    m_strStartDir = "";
+    m_scanAll = true;
+    m_pathsToScan.clear();
+    m_pathsToClean.clear();
+
+    VECSOURCES *srcs = CMediaSourceSettings::Get().GetSources("video");
+    if (srcs->size() == 0)
+      return;
+
+    m_database.Open();
+    for (IVECSOURCES it = srcs->begin(); it != srcs->end(); ++it) {
+      if ((*it).vecPaths.size() > 0) {
+        AddonPtr addon;
+        ScraperPtr scraper = boost::dynamic_pointer_cast<CScraper>(addon);
+        bool has_scraper = false;
+        if (! (*it).m_strScraper.empty() && 
+            CAddonMgr::Get().GetAddon((*it).m_strScraper, addon)) {
+          scraper = boost::dynamic_pointer_cast<CScraper>(addon);
+          has_scraper = true;
+        }
+
+        std::vector<CStdString>::iterator itt;
+        for (itt = (*it).vecPaths.begin(); itt != (*it).vecPaths.end(); ++itt) {
+          int ckId = m_database.GetPathId(*itt);
+          if (ckId == -1) {
+            if (! has_scraper) {
+              CLog::Log(LOGNOTICE, "Unable to add '%s' as no scraper set", (*itt).c_str());
+              continue;
+            }
+            SScanSettings settings;
+            settings.recurse = 1;
+            settings.parent_name = false;
+            m_database.SetScraperForPath(*itt, scraper, settings);
+          }
+          m_pathsToScan.insert((*itt));
+        }
+      }
+    }
+    m_database.Close();
+
+    m_bClean = g_advancedSettings.m_bVideoLibraryCleanOnUpdate;
+    StopThread();
+    Create();
+    m_bRunning = true;
+  }
+#endif
+
   bool CVideoInfoScanner::IsScanning()
   {
     return m_bRunning;
@@ -220,6 +272,7 @@ namespace VIDEO
 
   bool CVideoInfoScanner::DoScan(const CStdString& strDirectory)
   {
+CLog::Log(LOGINFO, "%s (%s)", __FUNCTION__, strDirectory.c_str());
     if (m_handle)
     {
       m_handle->SetText(g_localizeStrings.Get(20415));
@@ -251,8 +304,10 @@ namespace VIDEO
       return true;
 
     bool ignoreFolder = !m_scanAll && settings.noupdate;
-    if (content == CONTENT_NONE || ignoreFolder)
+    if (content == CONTENT_NONE || ignoreFolder) {
+      CLog::Log(LOGINFO, "Skipping %s as no content type or ignored folder...", strDirectory.c_str());
       return true;
+    }
 
     CStdString hash, dbHash;
     if (content == CONTENT_MOVIES ||content == CONTENT_MUSICVIDEOS)

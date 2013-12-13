@@ -5572,12 +5572,15 @@ void CApplication::StartVideoCleanup()
 
 void CApplication::StartVideoScan(const CStdString &strDirectory, bool scanAll)
 {
+CLog::Log(LOGINFO, "StartVideoScan(%s, %d)", strDirectory.c_str(), scanAll);
   if (m_videoInfoScanner->IsScanning())
     return;
-
+#ifdef HEADLESS
+  m_videoInfoScanner->ScanSources();
+#else
   m_videoInfoScanner->ShowDialog(true);
-
   m_videoInfoScanner->Start(strDirectory,scanAll);
+#endif
 }
 
 void CApplication::StartMusicScan(const CStdString &strDirectory, int flags)
@@ -5592,10 +5595,10 @@ void CApplication::StartMusicScan(const CStdString &strDirectory, int flags)
     if (CSettings::Get().GetBool("musiclibrary.backgroundupdate"))
       flags |= CMusicInfoScanner::SCAN_BACKGROUND;
   }
-
+#ifndef HEADLESS
   if (!(flags & CMusicInfoScanner::SCAN_BACKGROUND))
     m_musicInfoScanner->ShowDialog(true);
-
+#endif
   m_musicInfoScanner->Start(strDirectory, flags);
 }
 
@@ -5604,9 +5607,9 @@ void CApplication::StartMusicAlbumScan(const CStdString& strDirectory,
 {
   if (m_musicInfoScanner->IsScanning())
     return;
-
+#ifndef HEADLESS
   m_musicInfoScanner->ShowDialog(true);
-
+#endif
   m_musicInfoScanner->FetchAlbumInfo(strDirectory,refresh);
 }
 
@@ -5615,9 +5618,9 @@ void CApplication::StartMusicArtistScan(const CStdString& strDirectory,
 {
   if (m_musicInfoScanner->IsScanning())
     return;
-
+#ifndef HEADLESS
   m_musicInfoScanner->ShowDialog(true);
-
+#endif
   m_musicInfoScanner->FetchArtistInfo(strDirectory,refresh);
 }
 

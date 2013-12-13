@@ -582,6 +582,12 @@ AC_ARG_ENABLE([libav-compat],
   [use_libav_hacks=$enableval],
   [use_libav_hacks=no])
 
+AC_ARG_ENABLE([headless],
+  [AS_HELP_STRING([--enable-headless],
+  [build as headless. No GUI is possible using this option!])],
+  [build_headless=$enableval],
+  [build_headless=no])
+
 ### End of external library options
 
 if test "x$host_vendor" != "xapple"; then
@@ -816,6 +822,11 @@ else
   final_message="$final_message\n  Optimization:\tNo"
 fi
 
+if test "$build_headless" = "yes"; then
+  CFLAGS="$CFLAGS -DHEADLESS"
+  CXXFLAGS="$CXXFLAGS -DHEADLESS"
+  final_message="\n****  HEADLESS BUILD REQUESTED! There will be no GUI ****\n\n$final_message"
+fi
 
 # platform specific flags
 if echo "$ARCH" | grep -q "freebsd" ; then
