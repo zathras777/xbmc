@@ -52,6 +52,7 @@
 #include "GUIUserMessages.h"
 #include "addons/AddonManager.h"
 #include "addons/Scraper.h"
+#include "settings/MediaSourceSettings.h"
 
 #include <algorithm>
 
@@ -261,6 +262,34 @@ void CMusicInfoScanner::Start(const CStdString& strDirectory, int flags)
   Create();
   m_bRunning = true;
 }
+
+#ifdef HEADLESS
+void CMusicInfoScanner::ScanSources()
+{
+  m_fileCountReader.StopThread();
+  StopThread();
+  m_pathsToScan.clear();
+  m_flags = SCAN_ONLINE;
+
+  VECSOURCES *srcs = CMediaSourceSettings::Get().GetSources("music");
+  if (srcs->size() == 0)
+    return;
+
+  for (IVECSOURCES it = srcs->begin(); it != srcs->end(); ++it) {
+    if ((*it).vecPaths.size() > 0) {
+      std::vector<CStdString>::iterator itt;
+      for (itt = (*it).vecPaths.begin(); itt != (*it).vecPaths.end(); ++itt)
+        m_pathsToScan.insert((*itt));
+    }
+  }
+
+  m_bClean = g_advancedSettings.m_bMusicLibraryCleanOnUpdate;
+
+  m_scanType = 0;
+  Create();
+  m_bRunning = true;
+}
+#endif
 
 void CMusicInfoScanner::FetchAlbumInfo(const CStdString& strDirectory,
                                        bool refresh)

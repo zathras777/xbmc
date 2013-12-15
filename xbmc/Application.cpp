@@ -593,11 +593,13 @@ bool CApplication::Create()
 
   Preflight();
 
+#ifndef HEADLESS
   for (int i = RES_HDTV_1080i; i <= RES_PAL60_16x9; i++)
   {
     g_graphicsContext.ResetScreenParameters((RESOLUTION)i);
     g_graphicsContext.ResetOverscan((RESOLUTION)i, CDisplaySettings::Get().GetResolutionInfo(i).Overscan);
   }
+#endif
 
 #ifdef TARGET_POSIX
   tzset();   // Initialize timezone information variables
@@ -714,8 +716,10 @@ bool CApplication::Create()
   CStdString strExecutablePath;
   CUtil::GetHomePath(strExecutablePath);
 
+#ifndef HEADLESS
 #ifdef HAS_XRANDR
   g_xrandr.LoadCustomModeLinesToAllOutputs();
+#endif
 #endif
 
   // for python scripts that check the OS
@@ -727,6 +731,7 @@ bool CApplication::Create()
   CEnvironment::setenv("OS", "win32");
 #endif
 
+#ifndef HEADLESS
   g_powerManager.Initialize();
 
   // Load the AudioEngine before settings as they need to query the engine
@@ -735,13 +740,16 @@ bool CApplication::Create()
     CLog::Log(LOGFATAL, "CApplication::Create: Failed to load an AudioEngine");
     return false;
   }
+#endif
 
   // Initialize default Settings - don't move
   CLog::Log(LOGNOTICE, "load settings...");
   if (!CSettings::Get().Initialize())
     return false;
 
+#ifndef HEADLESS
   g_powerManager.SetDefaults();
+#endif
 
   // load the actual values
   if (!CSettings::Get().Load())
@@ -781,6 +789,7 @@ bool CApplication::Create()
     return false;
   }
 
+#ifndef HEADLESS
   // start the AudioEngine
   if (!CAEFactory::StartEngine())
   {
@@ -798,6 +807,7 @@ bool CApplication::Create()
   m_replayGainSettings.iPreAmp = CSettings::Get().GetInt("musicplayer.replaygainpreamp");
   m_replayGainSettings.iNoGainPreAmp = CSettings::Get().GetInt("musicplayer.replaygainnogainpreamp");
   m_replayGainSettings.bAvoidClipping = CSettings::Get().GetBool("musicplayer.replaygainavoidclipping");
+#endif
 
   // initialize the addon database (must be before the addon manager is init'd)
   CDatabaseManager::Get().Initialize(true);
@@ -813,8 +823,11 @@ bool CApplication::Create()
     CLog::Log(LOGFATAL, "CApplication::Create: Unable to start CAddonMgr");
     return false;
   }
+
+#ifndef HEADLESS
 #if defined(HAS_LIRC) || defined(HAS_IRSERVERSUITE)
   g_RemoteControl.Initialize();
+#endif
 #endif
 
   // set logging from debug add-on
@@ -823,6 +836,7 @@ bool CApplication::Create()
   if (addon)
     g_advancedSettings.SetExtraLogsFromAddon(addon.get());
 
+#ifndef HEADLESS
   g_peripherals.Initialise();
 
   // Create the Mouse, Keyboard, Remote, and Joystick devices
@@ -835,6 +849,7 @@ bool CApplication::Create()
 #if defined(TARGET_DARWIN_OSX)
   // Configure and possible manually start the helper.
   XBMCHelper::GetInstance().Configure();
+#endif
 #endif
 
   CUtil::InitRandomSeed();
@@ -1267,8 +1282,10 @@ bool CApplication::Initialize()
 
   StartServices();
 
+#ifndef HEADLESS
   // Init DPMS, before creating the corresponding setting control.
   m_dpms = new DPMSSupport();
+#endif
   if (g_windowManager.Initialized())
   {
     CSettings::Get().GetSetting("powermanagement.displaysoff")->SetRequirementsMet(m_dpms->IsSupported());
@@ -1444,16 +1461,22 @@ bool CApplication::Initialize()
   CLog::Log(LOGINFO, "removing tempfiles");
   CUtil::RemoveTempFiles();
 
+#ifndef HEADLESS
   if (!CProfilesManager::Get().UsingLoginScreen())
   {
     UpdateLibraries();
     SetLoggingIn(true);
   }
+#else
+  ScanSources();
+  SetLoggingIn(true);
+#endif
 
   m_slowTimer.StartZero();
-
+#ifndef HEADLESS
 #if defined(HAVE_LIBCRYSTALHD)
   CCrystalHD::GetInstance();
+#endif
 #endif
 
   CAddonMgr::Get().StartServices(true);
@@ -1461,13 +1484,14 @@ bool CApplication::Initialize()
   CLog::Log(LOGNOTICE, "initialize done");
 
   m_bInitializing = false;
-
+#ifndef HEADLESS
   // reset our screensaver (starts timers etc.)
   ResetScreenSaver();
 
 #ifdef HAS_SDL_JOYSTICK
   g_Joystick.SetEnabled(CSettings::Get().GetBool("input.enablejoystick") &&
                     CPeripheralImon::GetCountOfImonsConflictWithDInput() == 0 );
+#endif
 #endif
 
   return true;
@@ -5022,6 +5046,7 @@ void CApplication::Process()
 // We get called every 500ms
 void CApplication::ProcessSlow()
 {
+#ifndef HEADLESS
   g_powerManager.ProcessEvents();
 
 #if defined(TARGET_DARWIN_OSX)
@@ -5073,12 +5098,14 @@ void CApplication::ProcessSlow()
 
   // check for any idle myth sessions
   CMythSession::CheckIdle();
+#endif
 
 #ifdef HAS_FILESYSTEM_HTSP
   // check for any idle htsp sessions
   HTSP::CHTSPDirectorySession::CheckIdle();
 #endif
 
+#ifndef HEADLESS
 #ifdef HAS_KARAOKE
   if ( m_pKaraokeMgr )
     m_pKaraokeMgr->ProcessSlow();
@@ -5093,6 +5120,7 @@ void CApplication::ProcessSlow()
   // checks whats in the DVD drive and tries to autostart the content (xbox games, dvd, cdda, avi files...)
   if (!m_pPlayer->IsPlayingVideo())
     m_Autorun->HandleAutorun();
+#endif
 #endif
 
   // update upnp server/renderer states
@@ -5127,7 +5155,9 @@ void CApplication::ProcessSlow()
   if (!m_pPlayer->IsPlayingVideo())
     CAddonInstaller::Get().UpdateRepos();
 
+#ifndef HEADLESS
   CAEFactory::GarbageCollect();
+#endif
 }
 
 // Global Idle Time in Seconds
@@ -5540,6 +5570,19 @@ void CApplication::UpdateLibraries()
   }
 }
 
+#ifdef HEADLESS
+/* Bypass the updateonstartup settings to ensure that when headless we always
+ * respect the defined sources at startup.
+ */
+void CApplication::ScanSources()
+{
+  CLog::Log(LOGNOTICE, "%s - Starting video library startup scan", __FUNCTION__);
+  m_videoInfoScanner->ScanSources();
+  CLog::Log(LOGNOTICE, "%s - Starting music library startup scan", __FUNCTION__);
+  m_musicInfoScanner->ScanSources();
+}
+#endif
+
 bool CApplication::IsVideoScanning() const
 {
   return m_videoInfoScanner->IsScanning();
@@ -5575,12 +5618,10 @@ void CApplication::StartVideoScan(const CStdString &strDirectory, bool scanAll)
 CLog::Log(LOGINFO, "StartVideoScan(%s, %d)", strDirectory.c_str(), scanAll);
   if (m_videoInfoScanner->IsScanning())
     return;
-#ifdef HEADLESS
-  m_videoInfoScanner->ScanSources();
-#else
+#ifndef HEADLESS
   m_videoInfoScanner->ShowDialog(true);
-  m_videoInfoScanner->Start(strDirectory,scanAll);
 #endif
+  m_videoInfoScanner->Start(strDirectory,scanAll);
 }
 
 void CApplication::StartMusicScan(const CStdString &strDirectory, int flags)

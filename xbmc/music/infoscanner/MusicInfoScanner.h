@@ -55,6 +55,9 @@ public:
   virtual ~CMusicInfoScanner();
 
   void Start(const CStdString& strDirectory, int flags);
+#ifdef HEADLESS
+  void ScanSources();
+#endif
   void FetchAlbumInfo(const CStdString& strDirectory, bool refresh=false);
   void FetchArtistInfo(const CStdString& strDirectory, bool refresh=false);
   bool IsScanning();

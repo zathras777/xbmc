@@ -244,6 +244,9 @@ public:
   void StartMusicScan(const CStdString &path, int flags = 0);
   void StartMusicAlbumScan(const CStdString& strDirectory, bool refresh=false);
   void StartMusicArtistScan(const CStdString& strDirectory, bool refresh=false);
+#ifdef HEADLESS
+  void ScanSources();
+#endif
 
   void UpdateLibraries();
   void CheckMusicPlaylist();
